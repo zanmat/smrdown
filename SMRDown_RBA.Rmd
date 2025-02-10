@@ -1,0 +1,244 @@
+
+---
+date: "`r Sys.Date()`"
+output: 
+  rmsdown::paged_report:
+    front_img: "COVER_PHOTO_2.jpg"
+---
+
+``` {r setup, include=FALSE}
+
+country <- "Peru"
+
+pacman::p_load(unhcrthemes, tidyverse, activityinfo)
+# 
+# pacman::p_load(
+#   tidyverse, dplyr, tidyr, rlang, purrr, magrittr, expss, srvyr,
+#   readr,labelled,pastecs,psych,tableone, outbreaks, ggplot2, unhcrthemes,
+#   scales, gt,webshot2, sjlabelled, waffle, writexl, 
+#   readxl, kableExtra, activityinfo)
+
+activityInfoToken(Sys.getenv('ACTIVITYINFO_API'), prompt = FALSE)
+
+main_2024 <- queryTable("ce17lg8m4356o42nea") |> 
+  select("Means_Verification.Operation.Country.Country", 
+         "Means_Verification.Year",
+         "Means_Verification.Results_Level",
+         "Means_Verification.Indicator_Code",
+         "Means_Verification.Indicator",
+         "Means_Verification.Data_Source",
+         "Data_Source_Comments",
+         "ME_Activity_Comments",
+         "ME_Activity_Comments",
+         "Means_Verification.Population_Type",
+         "Means_Verification.Data_Collection_Frequency",
+         "Means_Verification.Unit_Type",
+         "Same_Source",
+         "Data_Source_Revised",
+         "Data_Comments_Revised",
+         "use_actuals",
+         "baseline_change_comm",
+         "Baseline_2024_Numerator",
+         "Baseline_2024_Denominator",
+         "Baseline_2024_Percent",
+         "Baseline_2024_Data_Limitations",
+         "Actual_2024_Numerator",
+         "Actual_2024_Denominator",
+         "Actual_2024_Percent",
+         "Actual_2024_Data_Limitations"
+         ) |> 
+      rename_with(~ gsub("_2024", "", .x)) |> 
+      filter(Means_Verification.Operation.Country.Country == country) |> 
+  mutate(Data_Source_Revised = if_else(Same_Source == "No", paste0(Data_Source_Revised, ". ", Data_Comments_Revised), Data_Source_Revised)) |> 
+  mutate(use_actuals = if_else(use_actuals == "Yes, Baselines 2024 are equal to reported Actuals 2023", "Yes", if_else(use_actuals == "No, Baselines 2024 need to be updated/adjusted or added", paste0("No: ", baseline_change_comm), "Does not apply")))
+
+main_2023 <- queryTable("cdn6y40lm87wi522") |> 
+  select("Means_Verification.Operation.Country.Country", 
+         "Means_Verification.Year",
+         "Means_Verification.Results_Level",
+         "Means_Verification.Indicator_Code",
+         "Means_Verification.Indicator",
+         "Means_Verification.Data_Source",
+         "Data_Source_Comments",
+         "ME_Activity_Comments",
+         "ME_Activity_Comments",
+         "Means_Verification.Population_Type",
+         "Means_Verification.Data_Collection_Frequency",
+         "Means_Verification.Unit_Type",
+         "Same_Source",
+         "Data_Source_Revised",
+         "Baseline_2023_Numerator",
+         "Baseline_2023_Denominator",
+         "Baseline_2023_Percent",
+         "Actual_2023_Numerator",
+         "Actual_2023_Denominator",
+         "Actual_2023_Percent"
+         ) |> 
+      rename_with(~ gsub("_2023", "", .x)) |> 
+  filter(Means_Verification.Operation.Country.Country == country) 
+
+main <- bind_rows(main_2023, main_2024) |>
+  mutate(Baseline = if_else(is.na(Baseline_Percent), Baseline_Numerator, Baseline_Percent)) |>
+  mutate(Actual = if_else(is.na(Actual_Percent), Actual_Numerator, Actual_Percent)) |>
+  select(!ends_with(c("nator", "rator", "cent"))) |> 
+  dplyr::arrange(Means_Verification.Indicator_Code, desc(Means_Verification.Year))
+
+```
+
+
+---
+title: "`r paste0(country, ' Core Indicators 2024')`"
+author: "`r paste0('UNHCR ', country)`"
+---
+
+# Results 
+
+``` {r charts, echo = FALSE, warning = FALSE, message = FALSE, results='asis',  fig.height = 4}
+
+charts <- function(x) {
+  
+label <- main |> 
+  filter(`Means_Verification.Indicator_Code` == x) |> 
+  mutate(label = paste0(Means_Verification.Results_Level, " ", word(Means_Verification.Indicator, 1))) |>
+  pull(label) |> 
+  first()
+
+label_long <- main |> 
+  filter(`Means_Verification.Indicator_Code` == x) |> 
+  mutate(label_long = paste0(Means_Verification.Results_Level, " ", Means_Verification.Indicator)) |>
+  pull(label_long) |> 
+  first()
+
+source <- main |> 
+  filter(`Means_Verification.Indicator_Code` == x) |> 
+  pull(Means_Verification.Data_Source) |> 
+  first()
+
+source_comments <- main |> 
+  filter(`Means_Verification.Indicator_Code` == x) |> 
+  pull(Data_Source_Comments) |> 
+  first()
+
+me_activity <- main |> 
+  filter(`Means_Verification.Indicator_Code` == x) |> 
+  pull(ME_Activity_Comments) |> 
+  first()
+
+frequency <- main |> 
+  filter(`Means_Verification.Indicator_Code` == x) |> 
+  pull(Means_Verification.Data_Collection_Frequency) |> 
+  first()
+
+unit_type <- main |> 
+  filter(`Means_Verification.Indicator_Code` == x) |> 
+  pull(Means_Verification.Unit_Type) |> 
+  first()
+
+actuals_2023_baseline <- main |> 
+  filter(`Means_Verification.Indicator_Code` == x) |> 
+  pull(use_actuals) |> 
+  first()
+
+baseline_limitations <- main |> 
+  filter(`Means_Verification.Indicator_Code` == x) |> 
+  pull(Baseline_Data_Limitations) |> 
+  first()
+
+actual_limitations <- main |> 
+  filter(`Means_Verification.Indicator_Code` == x) |> 
+  pull(Actual_Data_Limitations) |> 
+  first()
+
+same_source <- main |> 
+  filter(`Means_Verification.Indicator_Code` == x) |> 
+  mutate(Same_Source = if_else(Same_Source == "Yes", "Yes", paste0("No: ", Data_Source_Revised))) |> 
+  pull(Same_Source) |> 
+  first()
+
+df <- main |> 
+  filter(`Means_Verification.Indicator_Code` == x) |> 
+  select(Means_Verification.Year,          Means_Verification.Population_Type, Baseline, Actual) |> 
+  pivot_longer(cols = c(Baseline, Actual), names_to = "Tipo", values_to = "value") |> 
+  mutate(Tipo = if_else(Tipo == "Actual", "EY Actual", Tipo)) |> 
+  rename(pop_groups = Means_Verification.Population_Type) |> 
+  rename(year = Means_Verification.Year) |> 
+  mutate(Tipo = paste0(year, " ", Tipo))
+  
+###Chart of impact 1_1 by pop groups
+
+ymax <- max(df$value) * 1.3
+
+c <- ggplot(df, aes(x = Tipo, y = value, fill = pop_groups)) +
+  geom_bar(stat = "identity", position = "dodge", width = 0.7) +
+  geom_text(aes(label = round(value, 2)), 
+            vjust = -0.5, position = position_dodge(0.7)) +  # Add labels for mean_value
+  scale_y_continuous(limits = c(0, ymax), expand = c(0, 0)) +
+  labs(
+    title = paste0("Results of RBM Core ", label),
+    x = "Year and Type",
+    y = "Value"
+  ) +
+  scale_fill_unhcr_d() +  # Use UNHCR color palette (requires unhcrthemes package)
+  theme_unhcr() +         # Apply UNHCR theme (requires unhcrthemes package)
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)  # Rotate x-axis labels for better readability
+  )
+  
+ cat("\n")
+ cat(glue::glue("### {label_long}"), sep = " ")
+  cat("\n")
+ 
+  
+cat('<div style="font-family: Arial, sans-serif; font-size: 16px;">')
+ 
+cat('<div style="width: 100%; margin-bottom: 10px;">')
+ print(c)  # Print chart
+ 
+ cat("\n")
+  cat('</div>')
+
+ cat('<div style="display: flex; justify-content: space-between; align-items: start; font-size: 11px">')
+ 
+# cat("::: {}")
+ cat("\n")
+ cat('<div style="width: 45%;">')
+ cat("**Source:**", source, sep = " ")  
+ cat("\n\n")
+ cat("**Source Comments:**", source_comments, sep = " ")  
+ cat("\n\n")
+ cat("**M&E Activity:**", me_activity, sep = " ")  
+ cat("\n\n")
+ cat("**Frequency:**", frequency, sep = " ")  
+ cat("\n\n")
+ cat("**Unit Type:**", unit_type, sep = " ")  
+ cat("\n\n")
+ cat('</div>')
+ 
+ cat('<div style="width: 45%;">')
+ cat("**Same Source in 2024 as planned? **", same_source, sep = " ")  
+ cat("\n\n")
+ cat("**Should the reported 2023 Actuals be used for 2024 Baseline? **", actuals_2023_baseline, sep = " ")  
+ cat("\n\n")
+ cat("**2024 Baseline Limitations **", baseline_limitations, sep = " ")  
+ cat("\n\n")
+ cat("**2024 Actual Limitations **", actual_limitations, sep = " ")  
+ cat("\n\n")
+ cat('</div>')
+ 
+ 
+cat('</div>')
+cat('</div>')
+
+ cat("\n")
+cat('\\newpage')
+ cat("\n")
+
+ }
+
+unique_groups <- as.vector(unique(main$Means_Verification.Indicator_Code))
+
+walk(unique_groups, charts)
+
+```
+
+
